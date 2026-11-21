@@ -1,0 +1,1 @@
+{"name":"educore-ai","version":"3.0.0","type":"module","scripts":{"start":"node server.js","test":"node test/e2e.mjs"},"engines":{"node":">=20"},"dependencies":{"cheerio":"^1.0.0","dotenv":"^16.4.5","express":"^4.19.2"}}
