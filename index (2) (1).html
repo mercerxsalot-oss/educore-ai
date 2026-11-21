@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>EduCore AI 3.0</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#0B1020;--card:#151D30;--p:#6366F1;--s:#8B5CF6;--tx:#F8FAFC;--mu:#94a3b8;--bd:#26304a;--fs:16px;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+:root[data-theme="light"]{--bg:#f4f6fb;--card:#fff;--tx:#0f172a;--mu:#5b6478;--bd:#dde2ee;color-scheme:light}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f6fb;--card:#fff;--tx:#0f172a;--mu:#5b6478;--bd:#dde2ee;color-scheme:light}}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:var(--fs)/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+#app{display:flex;height:100%}
+nav{width:230px;background:var(--card);border-inline-end:1px solid var(--bd);padding:14px;display:flex;flex-direction:column;gap:4px;overflow:auto}
+.logo{font-weight:800;font-size:1.2em;background:linear-gradient(90deg,var(--p),var(--s));-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:10px}
+nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:10px;color:var(--mu)}
+nav button:hover{background:var(--bd)}nav button.on{background:linear-gradient(90deg,var(--p),var(--s));color:#fff}
+main{flex:1;overflow:auto;padding:22px;max-width:1000px;margin:auto;width:100%}
+h2{margin:0 0 14px}h3{margin:0 0 6px;font-size:1em}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px #0003}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.tile{cursor:pointer;transition:.15s}.tile:hover{transform:translateY(-2px);border-color:var(--p)}
+button.b,select,input,textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:9px 12px}
+button.b{cursor:pointer;background:linear-gradient(90deg,var(--p),var(--s));border:0;color:#fff;margin:2px}
+button.b.g{background:var(--bd);color:var(--tx)}button.b:disabled{opacity:.5}
+textarea,input[type=text]{width:100%}textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.mu{color:var(--mu)}.rec{display:inline-block;width:11px;height:11px;border-radius:50%;background:#ef4444;animation:pu 1s infinite}
+@keyframes pu{50%{opacity:.2}}
+.lbl{font-size:.72em;font-weight:700;letter-spacing:.06em;color:var(--s);text-transform:uppercase;margin-top:8px}
+.msg{padding:10px 14px;border-radius:14px;margin:6px 0;max-width:85%;white-space:pre-wrap}
+.msg.u{background:var(--p);color:#fff;margin-inline-start:auto}.msg.a{background:var(--card);border:1px solid var(--bd)}
+.err{color:#f87171}.spin{width:18px;height:18px;border:3px solid var(--bd);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+.fc{min-height:120px;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;font-size:1.2em}
+.opt{display:block;width:100%;text-align:start;margin:4px 0}.ok{border-color:#22c55e!important}.no{border-color:#ef4444!important}
+.tw{white-space:pre-wrap}
+@media(max-width:720px){#app{flex-direction:column-reverse}nav{width:100%;flex-direction:row;overflow-x:auto;border-inline-end:0;border-top:1px solid var(--bd);padding:8px}.logo{display:none}nav button{white-space:nowrap;font-size:.85em}main{padding:14px}}
+</style></head><body><div id="app"><nav id="nav"></nav><main id="main"></main></div>
+<script>
+/* ===== v3 runtime: works outside the Claude artifact via the Node backend ===== */
+const BASE=()=>{try{return(localStorage.getItem("ec_base")||"").replace(/\/$/,"")}catch(e){return""}};
+const H=()=>{const c=sessionStorage.getItem("ec_code");return c?{"x-access-code":c}:{}};
+async function api(p,o={},retry=1){let r;try{r=await fetch(BASE()+p,{...o,headers:{"Content-Type":"application/json",...H(),...(o.headers||{})}})}catch(e){throw new Error("Network error: backend not reachable")}
+if(r.status===401&&retry){const c=prompt("Access code:");if(c){sessionStorage.setItem("ec_code",c);return api(p,o,0)}}return r}
+async function apiJSON(p,body){const r=await api(p,{method:"POST",body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Server error "+r.status);return j}
+async function apiStream(p,body,on){const r=await api(p,{method:"POST",body:JSON.stringify(body)});if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||"Server error "+r.status)}
+const rd=r.body.getReader(),dc=new TextDecoder();let buf="",res=null;for(;;){const{done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split("\n");buf=ls.pop();for(const l of ls){if(!l.trim())continue;const e=JSON.parse(l);if(e.error)throw new Error(e.error);if(e.result)res=e.result;else on(e)}}
+if(!res)throw new Error("No result received");return res}
+const b64=b=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result.split(",")[1]);f.readAsDataURL(b)});
+function mkSample(){const f=async(input,o={})=>{const images=await Promise.all((o.images||[]).map(async b=>({type:b.type,data:await b64(b)})));const j=await apiJSON("/api/ai",{input,images});o.onText&&o.onText({text:j.text});return{text:j.text}};
+f.json=async(p,o)=>{const t=(await f(p,o)).text,m=t.match(/\{[\s\S]*\}|\[[\s\S]*\]/);if(!m)throw new Error("AI returned no JSON");return JSON.parse(m[0])};f.limits=async()=>({images:true});return f}
+function mkDict(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let cb={p(){},f(){},s(){}},rec,mr,on=false;const lang=()=>(document.querySelector("#sl")||{}).value||"de-DE";
+return{onPartial:f=>cb.p=f,onFinal:f=>cb.f=f,onState:f=>cb.s=f,
+async start(){on=true;
+if(SR){rec=new SR();rec.lang=lang();rec.continuous=true;rec.interimResults=true;
+rec.onresult=e=>{let i="";for(let k=e.resultIndex;k<e.results.length;k++){const r=e.results[k];if(r.isFinal)cb.f({text:r[0].transcript.trim()});else i+=r[0].transcript}cb.p({text:i})};
+rec.onend=()=>{if(on)try{rec.start()}catch(e){}else cb.s({state:"idle",reason:"stopped"})};
+rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed"){on=false;cb.s({state:"idle",reason:"not_granted"})}};
+rec.start();cb.s({state:"listening"});return}
+/* fallback: record 7 s clips, transcribe on the server (needs OPENAI_API_KEY) */
+const st=await navigator.mediaDevices.getUserMedia({audio:true});cb.s({state:"listening"});
+(async()=>{while(on){const bl=await new Promise(res=>{const m=new MediaRecorder(st),ch=[];m.ondataavailable=e=>ch.push(e.data);m.onstop=()=>res(new Blob(ch,{type:m.mimeType}));m.start();setTimeout(()=>m.state!=="inactive"&&m.stop(),7000);mr=m});
+if(bl.size<2000)continue;try{const r=await api("/api/transcribe?lang="+lang().slice(0,2),{method:"POST",headers:{"Content-Type":bl.type||"audio/webm"},body:bl});const j=await r.json();if(j.text)cb.f({text:j.text});else if(j.error){on=false;alert(j.error)}}catch(e){}}
+st.getTracks().forEach(t=>t.stop());cb.s({state:"idle",reason:"stopped"})})()},
+async stop(){on=false;try{rec&&rec.stop()}catch(e){}if(mr&&mr.state!=="inactive")mr.stop()}}}
+if(!window.claude){const S={sample:mkSample(),dictation:(window.SpeechRecognition||window.webkitSpeechRecognition||navigator.mediaDevices)?mkDict():null,downloads:{save:async({filename,data})=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data]));a.download=filename;a.click()}}};window.claude={use:async n=>S[n]||null}}
+const T={de:{dash:"Dashboard",live:"Classroom Live",chat:"KI-Chat",hw:"Hausaufgaben",notes:"Notizen",tr:"Übersetzer",study:"Lernmodus",cards:"Karteikarten",hist:"Verlauf",set:"Einstellungen",hi:"Willkommen bei EduCore AI",tag:"Jede Stunde verstehen. Grenzenlos lernen."},
+en:{dash:"Dashboard",live:"Classroom Live",chat:"AI Chat",hw:"Homework Solver",notes:"Lesson Notes",tr:"Translator",study:"Study Mode",cards:"Flashcards",hist:"History",set:"Settings",hi:"Welcome to EduCore AI",tag:"Understand Every Lesson. Learn Without Limits."},
+ar:{dash:"الرئيسية",live:"الفصل المباشر",chat:"محادثة الذكاء",hw:"حل الواجبات",notes:"ملاحظات الدروس",tr:"المترجم",study:"وضع الدراسة",cards:"البطاقات",hist:"السجل",set:"الإعدادات",hi:"مرحبًا بك في EduCore AI",tag:"افهم كل درس. تعلّم بلا حدود."}};
+const VIEWS=["dash","live","chat","hw","notes","tr","study","cards","hist","set"];
+const LN={de:"German",en:"English",ar:"Arabic"};
+const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
+const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+let St=ld("ec_set",{ui:"de",resp:"all",theme:"dark",size:16,level:"Realschule/Gymnasium"});
+let Notes=ld("ec_notes",[]),Hist=ld("ec_hist",[]),view="dash";
+let chat=[],live={on:false,paused:false,text:"",t0:0,elapsed:0,res:null,note:null},sm=null,dict=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const t=k=>T[St.ui][k];
+function log(k,x){Hist.unshift({k,x:String(x).slice(0,90),d:new Date().toLocaleString()});Hist=Hist.slice(0,50);sv("ec_hist",Hist)}
+function theme(){const r=document.documentElement;r.dataset.theme=St.theme;r.style.setProperty("--fs",St.size+"px");r.dir=St.ui==="ar"?"rtl":"ltr";r.lang=St.ui}
+const SYS=()=>`You are EduCore AI, a careful school assistant for a student (level: ${St.level}). German answers must sound natural and student-friendly. Never invent facts; if unsure, say so explicitly. Never pretend unclear speech was understood. `;
+const RL=()=>St.resp==="all"?"German, English and Arabic":LN[St.resp];
+async function ai(p){const s=await claude.use("sample");if(!s)throw new Error("AI is not available in this view. Open the artifact signed in on claude.ai and allow AI access.");return s.json(SYS()+p+"\nReturn ONLY valid JSON.")}
+function busy(el){el.innerHTML='<span class="spin"></span> …'}
+function card(h,b){return `<div class="card"><h3>${h}</h3><div class="tw">${b}</div></div>`}
+function fields(o,map){return Object.entries(map).map(([k,l])=>{let v=o[k];if(v==null||v==="")return"";if(Array.isArray(v))v="• "+v.map(x=>typeof x==="object"?esc(JSON.stringify(x)):esc(x)).join("\n• ");else v=esc(v);return `<div class="lbl">${l}</div><div>${v}</div>`}).join("")}
+function nav(){$("#nav").innerHTML='<div class="logo">EduCore AI</div>'+VIEWS.map(v=>`<button class="${v===view?"on":""}" onclick="go('${v}')">${t(v)}</button>`).join("")}
+function go(v){view=v;nav();R[v]();$("#main").scrollTop=0}
+const R={};
+R.dash=()=>{$("#main").innerHTML=`<h2>${t("hi")}</h2><p class="mu">${t("tag")}</p><div class="grid">${[["live","🎙️"],["hw","📘"],["chat","💬"],["tr","🌍"],["study","🧠"],["notes","📝"]].map(([k,i])=>`<div class="card tile" onclick="go('${k}')"><div style="font-size:1.8em">${i}</div><h3>${t(k)}</h3></div>`).join("")}</div>
+${card(t("notes")+" ("+Notes.length+")",Notes.slice(0,3).map(n=>"• "+esc(n.title)).join("\n")||'<span class="mu">—</span>')}${card(t("hist"),Hist.slice(0,4).map(h=>"• "+esc(h.k+": "+h.x)).join("\n")||'<span class="mu">—</span>')}`};
+/* CHAT */
+R.chat=()=>{$("#main").innerHTML=`<h2>${t("chat")}</h2><div id="cl"></div><div class="row"><input id="ci" type="text" placeholder="…" style="flex:1" onkeydown="if(event.key==='Enter')sendChat()"><button class="b g" id="cm" onclick="mic('ci','cm')">🎤</button><button class="b" onclick="sendChat()">➤</button></div><p class="mu">Optional spoken answers: <button class="b g" onclick="speakLast()">🔊</button></p>`;drawChat()};
+function drawChat(){const c=$("#cl");if(c)c.innerHTML=chat.map(m=>`<div class="msg ${m.role==="user"?"u":"a"}">${esc(m.content)}</div>`).join("")}
+async function sendChat(){const i=$("#ci"),q=i.value.trim();if(!q)return;i.value="";chat.push({role:"user",content:q});chat.push({role:"assistant",content:"…"});drawChat();log("chat",q);
+try{const s=await claude.use("sample");if(!s)throw new Error("AI unavailable here.");const h=chat.slice(0,-1).slice(-10);h[0]={role:"user",content:SYS()+"Answer in "+RL()+", concisely.\n\n"+h[0].content};if(h[0].role!=="user")h.shift();
+const r=await s(h,{cache:false,onText:({text})=>{chat[chat.length-1].content=text;drawChat()}});chat[chat.length-1].content=r.text;drawChat()}catch(e){chat[chat.length-1].content="⚠ "+(e.message||e.code||"Error");drawChat()}}
+function speakLast(){const m=[...chat].reverse().find(x=>x.role==="assistant");if(!m||!window.speechSynthesis)return alert("Text-to-speech is not supported here.");speechSynthesis.speak(new SpeechSynthesisUtterance(m.content))}
+/* DICTATION */
+async function mic(inp,btn){const b=$("#"+btn),i=$("#"+inp);if(dict&&dict.active){await dict.d.stop();return}
+let d;try{d=await claude.use("dictation")}catch(e){}
+if(!d){alert("Speech recognition is not supported in this browser or view. Please type instead.");return}
+const base=i.value;dict={d,active:true};d.onPartial(({text})=>{i.value=(base+" "+text).trim()});d.onFinal(({text})=>{i.value=(i.value+" "+text).trim()});d.onState(({state})=>{if(state==="idle"){dict.active=false;b.textContent="🎤"}else b.textContent="⏹"});
+try{await d.start()}catch(e){dict.active=false;alert("Microphone not available ("+(e.code||e.message)+").")}}
+/* LIVE */
+R.live=()=>{$("#main").innerHTML=`<h2>${t("live")}</h2>
+<div class="card"><label><input type="checkbox" id="cons"> I have permission (teacher, school rules and everyone captured agree). No audio is stored; only text appears below.</label>
+<div class="row"><button class="b" id="st" onclick="liveStart()">▶ Start</button><button class="b g" onclick="livePause()">⏸ Pause</button><button class="b g" onclick="liveStop()">⏹ Stop</button><button class="b g" onclick="live.text='';$('#tr').value=''">🗑 Clear</button>
+<span id="ind" class="mu">○ Not recording</span><span id="tm" class="mu"></span></div>
+<div class="lbl">1 · Live transcription</div><div class="row"><label>🎙 Speech language <select id="sl"><option value="de-DE">Deutsch</option><option value="en-US">English</option><option value="ar-SA">العربية</option></select></label></div><textarea id="tr" style="min-height:160px" placeholder="Live transcript (you can also type or paste what was said)…" oninput="live.text=this.value"></textarea>
+<p class="mu" style="margin:4px 0">Detected speech is shown as raw text; AI results below are labelled AI-generated and may contain errors.</p>
+<div class="row"><label><input type="checkbox" id="au" checked> Auto-detect questions</label><button class="b" onclick="manualQ()">🔍 Search this question</button></div><div class="row"><button class="b" onclick="analyze()">🔎 Analyze</button><button class="b" onclick="mkNotes()">📝 Generate lesson summary</button></div></div><div id="q16"></div><div id="lo"></div>`;$("#tr").value=live.text;if(RS.cur)showQ(RS.cur[0],RS.cur[1]);liveUI();if(live.res)showAn();if(live.note)showNote()};
+function liveUI(){const i=$("#ind");if(!i)return;i.innerHTML=live.on&&!live.paused?'<span class="rec"></span> <b style="color:#ef4444">RECORDING</b>':live.on?"⏸ Paused":"○ Not recording"}
+setInterval(()=>{if(live.on&&!live.paused){live.elapsed++;}const e=$("#tm");if(e&&live.on){const s=live.elapsed;e.textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}},1000);
+async function liveStart(){if(!$("#cons").checked)return alert("Please confirm permission first.");
+let d;try{d=await claude.use("dictation")}catch(e){}
+if(!d){alert("Live transcription is not supported in this browser or view (Chromium browsers work best). Type or paste the transcript instead.");return}
+live.on=true;live.paused=false;live.d=d;live.base=live.text;
+d.onPartial(({text})=>{if(!live.paused)$("#tr").value=(live.text+" "+text).trim()});
+d.onFinal(({text})=>{if(!live.paused){live.text=(live.text+" "+text).trim();$("#tr").value=live.text;autoDetect(text)}});
+d.onState(({state})=>{if(state==="idle"&&live.on&&!live.paused)setTimeout(()=>live.on&&!live.paused&&d.start().catch(()=>{}),300)});
+try{await d.start();liveUI()}catch(e){live.on=false;liveUI();alert("Microphone not available ("+(e.code||e.message)+").")}}
+async function livePause(){if(!live.on)return;live.paused=!live.paused;if(live.paused)await live.d.stop().catch(()=>{});else live.d.start().catch(()=>{});liveUI()}
+async function liveStop(){if(live.d)await live.d.stop().catch(()=>{});live.on=false;live.paused=false;liveUI()}
+async function analyze(){const o=$("#lo"),x=live.text.trim();if(!x)return;busy(o);
+try{live.res=await ai(`Analyze this classroom transcript (speech-to-text, may contain errors). Respond language for explanations: ${RL()}. Distinguish real teacher questions from explanations; if unsure set "possible":true. Schema: {"language":"","questions":[{"de":"","en":"","ar":"","possible":false,"short_de":"","answer_en":"","answer_ar":"","detailed":"","simple":"","example":""}],"homework":[],"definitions":[],"dates":[],"vocab":[]}\nTranscript:\n${x.slice(-6000)}`);log("live","analysis");showAn()}catch(e){o.innerHTML=`<p class="err">${esc(e.message||e.code)}</p>`}}
+function showAn(){const r=live.res,o=$("#lo");o.innerHTML=card("🌐 "+esc(r.language||"?"),"")+(r.questions||[]).map(q=>card((q.possible?"POSSIBLE QUESTION":"QUESTION DETECTED")+" · AI",fields(q,{de:"Deutsch",en:"English",ar:"العربية",short_de:"Antwort (DE)",answer_en:"English explanation",answer_ar:"شرح بالعربية",detailed:"Detailed",simple:"Easy",example:"Example"}))).join("")+card("AI notes",fields(r,{homework:"Homework",definitions:"Definitions",dates:"Dates / exams",vocab:"Vocabulary"}))}
+async function mkNotes(){const o=$("#lo"),x=live.text.trim();if(!x)return;busy(o);
+try{live.note=await ai(`Turn this permitted classroom transcript into structured lesson notes. Mention dates/tests only if explicitly said. Schema: {"title":"","topic":"","info":[],"definitions":[],"questions":[],"answers":[],"homework":[],"vocab":[],"dates":[],"summary_de":"","summary_en":"","summary_ar":""}\nTranscript:\n${x.slice(-8000)}`);log("notes",live.note.title);showNote()}catch(e){o.innerHTML=`<p class="err">${esc(e.message||e.code)}</p>`}}
+function noteText(n){return `# ${n.title||""}\n${n.topic||""}\n\n`+[["Info",n.info],["Definitions",n.definitions],["Questions",n.questions],["Answers",n.answers],["Homework",n.homework],["Vocabulary",n.vocab],["Dates",n.dates]].filter(a=>a[1]&&a[1].length).map(([h,a])=>"## "+h+"\n"+a.map(x=>"- "+(typeof x==="object"?JSON.stringify(x):x)).join("\n")).join("\n\n")+`\n\n## Deutsch\n${n.summary_de||""}\n\n## English\n${n.summary_en||""}\n\n## العربية\n${n.summary_ar||""}`}
+function showNote(){const n=live.note;$("#lo").innerHTML=card("📝 "+esc(n.title),esc(noteText(n)))+`<div class="row"><button class="b" onclick="saveNote()">💾 Save note (text only)</button></div>`}
+function saveNote(){Notes.unshift({id:Date.now(),title:live.note.title||"Lesson",body:noteText(live.note),d:new Date().toLocaleDateString()});sv("ec_notes",Notes);alert("Saved.")}
+/* HOMEWORK */
+R.hw=()=>{$("#main").innerHTML=`<h2>${t("hw")}</h2><div class="card"><div class="row"><select id="sj">${["Mathematik","Deutsch","Englisch","Biologie","Physik","Chemie","Geschichte","Erdkunde","Politik","Informatik"].map(s=>`<option>${s}</option>`).join("")}</select><select id="sy"><option>Normal</option><option>Short</option><option>Full explanation</option><option>Simple German (A1–B1)</option><option>Exam preparation</option></select></div>
+<textarea id="hq" placeholder="Question / exercise…"></textarea><div class="row"><input type="file" id="hf" accept="image/*"><button class="b g" id="hm" onclick="mic('hq','hm')">🎤</button><button class="b" onclick="solve()">Solve</button></div><p class="mu">Image upload works when image input is available. PDFs: copy the text into the box.</p></div><div id="ho"></div>`};
+async function solve(){const o=$("#ho"),q=$("#hq").value.trim(),f=$("#hf").files[0];if(!q&&!f)return;busy(o);
+try{const s=await claude.use("sample");if(!s)throw new Error("AI unavailable here.");const p=SYS()+`Subject: ${$("#sj").value}. Style: ${$("#sy").value}. Solve correctly; if unsure say so. Explain in ${RL()}. Schema: {"solution":"","steps":[],"final":"","de":"","en":"","ar":"","notebook":"short ready-to-write German answer for the notebook (Heft)"}. Return ONLY JSON.\n`+q;
+let opt={};if(f){const l=await s.limits();if(!l.images)throw new Error("Image input is not available here; type the exercise instead.");opt.images=[f]}
+const r=await s.json(p,opt);log("homework",q||f.name);o.innerHTML=card("✅ AI",fields(r,{solution:"Solution",steps:"Steps",final:"Final answer",de:"Deutsch",en:"English",ar:"العربية",notebook:"Was soll ich ins Heft schreiben?"}))}catch(e){o.innerHTML=`<p class="err">${esc(e.message||e.code)}</p>`}}
+/* TRANSLATOR */
+R.tr=()=>{$("#main").innerHTML=`<h2>${t("tr")}</h2><div class="card"><div class="row"><select id="fr">${Object.entries(LN).map(([k,v])=>`<option value="${v}">${v}</option>`).join("")}</select>→<select id="to">${Object.entries(LN).map(([k,v])=>`<option value="${v}" ${k==="ar"?"selected":""}>${v}</option>`).join("")}</select></div><textarea id="tq"></textarea><div class="row"><button class="b g" id="tm2" onclick="mic('tq','tm2')">🎤</button><button class="b" onclick="trans()">Translate</button></div></div><div id="to2"></div>`};
+async function trans(){const o=$("#to2"),q=$("#tq").value.trim();if(!q)return;busy(o);
+try{const r=await ai(`Translate from ${$("#fr").value} to ${$("#to").value}, preserving meaning. Schema: {"translation":"","pronunciation":"","explanation":"clear simple explanation of the sentence (in Arabic if target or source is Arabic)","grammar":"German grammar notes if German is involved","vocab":[]}\nText: ${q}`);log("translate",q);o.innerHTML=card("🌍 AI",fields(r,{translation:"Translation",pronunciation:"Pronunciation",explanation:"Explanation",grammar:"Grammar",vocab:"Vocabulary"}))}catch(e){o.innerHTML=`<p class="err">${esc(e.message||e.code)}</p>`}}
+/* STUDY */
+let Q={items:[],i:0,sc:0,mode:"quiz",flip:false};
+function studyView(mode){Q.mode=mode;$("#main").innerHTML=`<h2>${t(mode==="quiz"?"study":"cards")}</h2><div class="card"><input id="sp" type="text" placeholder="Topic, e.g. Erneuerbare Energien / Dativ / Brüche"><div class="row"><select id="sd"><option>Easy</option><option selected>Medium</option><option>Hard</option></select>${mode==="quiz"?`<select id="sk"><option>multiple choice</option><option>true or false</option><option>vocabulary</option><option>grammar</option><option>exam simulation</option></select>`:""}<button class="b" onclick="genStudy()">Generate</button></div></div><div id="so"></div>`;if(Q.mode===mode&&Q.items.length&&Q.m===mode)drawStudy()}
+R.study=()=>studyView("quiz");R.cards=()=>studyView("cards");
+async function genStudy(){const o=$("#so"),p=$("#sp").value.trim();if(!p)return;busy(o);
+try{const sch=Q.mode==="quiz"?`{"items":[{"q":"","options":["","","",""],"answer":0,"explanation":""}]} (5 items; for true/false use options ["True","False"]; questions in German with ${RL()} explanations)`:`{"items":[{"front":"","back":""}]} (8 cards; German front, ${RL()} back)`;
+const r=await ai(`Create study material about "${p}", difficulty ${$("#sd").value}${Q.mode==="quiz"?", type "+$("#sk").value:""}. Only factual content. Schema: ${sch}`);Q={items:r.items||[],i:0,sc:0,mode:Q.mode,m:Q.mode,flip:false};log("study",p);drawStudy()}catch(e){o.innerHTML=`<p class="err">${esc(e.message||e.code)}</p>`}}
+function drawStudy(){const o=$("#so"),it=Q.items[Q.i];if(!o)return;
+if(!it){o.innerHTML=card("Done",Q.mode==="quiz"?`Score: ${Q.sc}/${Q.items.length}`:"All cards seen.");return}
+if(Q.mode==="cards"){o.innerHTML=`<div class="card fc" onclick="Q.flip=!Q.flip;drawStudy()">${esc(Q.flip?it.back:it.front)}</div><div class="row"><button class="b g" onclick="Q.i=Math.max(0,Q.i-1);Q.flip=false;drawStudy()">◀</button><span class="mu">${Q.i+1}/${Q.items.length}</span><button class="b" onclick="Q.i++;Q.flip=false;drawStudy()">▶</button></div>`;return}
+o.innerHTML=`<div class="card"><h3>${Q.i+1}/${Q.items.length} · ${esc(it.q)}</h3>${(it.options||[]).map((x,j)=>`<button class="b g opt" onclick="pick(${j},this)">${esc(x)}</button>`).join("")}<div id="ex"></div></div>`}
+function pick(j,el){const it=Q.items[Q.i],bs=[...document.querySelectorAll(".opt")];if(bs[0].disabled)return;bs.forEach((b,k)=>{b.disabled=true;if(k===it.answer)b.classList.add("ok")});if(j===it.answer)Q.sc++;else el.classList.add("no");$("#ex").innerHTML=`<p>${esc(it.explanation)}</p><button class="b" onclick="Q.i++;drawStudy()">Next ▶</button>`}
+/* NOTES */
+let cur=null;
+R.notes=()=>{$("#main").innerHTML=`<h2>${t("notes")}</h2>`+(Notes.length?Notes.map((n,i)=>`<div class="card"><h3>${esc(n.title)} <span class="mu">${esc(n.d)}</span></h3><div class="row"><button class="b g" onclick="cur=${i};editNote()">✏️ Edit</button><button class="b g" onclick="navigator.clipboard.writeText(Notes[${i}].body)">📋 Copy</button><button class="b g" onclick="exportNote(${i})">⬇ Export</button><button class="b g" onclick="Notes.splice(${i},1);sv('ec_notes',Notes);R.notes()">🗑</button></div></div>`).join(""):'<p class="mu">No saved notes yet. Create them in Classroom Live.</p>')};
+function editNote(){const n=Notes[cur];$("#main").innerHTML=`<h2>${esc(n.title)}</h2><textarea id="ne" style="min-height:60vh">${esc(n.body)}</textarea><div class="row"><button class="b" onclick="Notes[cur].body=$('#ne').value;sv('ec_notes',Notes);R.notes()">💾 Save</button><button class="b g" onclick="R.notes()">Back</button></div>`}
+async function exportNote(i){const d=await claude.use("downloads");if(!d)return navigator.clipboard.writeText(Notes[i].body),alert("Download unavailable; copied to clipboard.");try{await d.save({filename:"note-"+Notes[i].id+".md",data:Notes[i].body})}catch(e){}}
+R.hist=()=>{$("#main").innerHTML=`<h2>${t("hist")}</h2>`+(Hist.map(h=>`<div class="card"><b>${esc(h.k)}</b> ${esc(h.x)} <span class="mu">${esc(h.d)}</span></div>`).join("")||'<p class="mu">—</p>')};
+/* SETTINGS */
+R.set=()=>{const o=(v,l,c)=>`<option value="${v}" ${c===v?"selected":""}>${l}</option>`;$("#main").innerHTML=`<h2>${t("set")}</h2><div class="card">
+<div class="row"><label>Interface <select onchange="St.ui=this.value;ss()">${o("de","Deutsch",St.ui)}${o("en","English",St.ui)}${o("ar","العربية",St.ui)}</select></label>
+<label>Answers <select onchange="St.resp=this.value;ss(1)">${o("all","DE + EN + AR",St.resp)}${o("de","Deutsch",St.resp)}${o("en","English",St.resp)}${o("ar","العربية",St.resp)}</select></label>
+<label>Theme <select onchange="St.theme=this.value;ss(1)">${o("dark","Dark",St.theme)}${o("light","Light",St.theme)}</select></label>
+<label>Text size <select onchange="St.size=+this.value;ss(1)">${o(14,"S",St.size)}${o(16,"M",St.size)}${o(19,"L",St.size)}</select></label></div>
+<label>Backend URL (leave empty if this page is served by the backend) <input type="text" placeholder="https://your-backend.example.com" value="${esc((()=>{try{return localStorage.getItem("ec_base")||""}catch(e){return""}})())}" onchange="try{localStorage.setItem('ec_base',this.value.trim())}catch(e){}"></label>
+<label>School level <input type="text" value="${esc(St.level)}" onchange="St.level=this.value;ss(1)"></label></div>
+<div class="card"><h3>Privacy</h3><p class="mu">Microphone access is requested only when you start recording; permissions are managed in your browser. Raw audio is never stored. Notes and history stay in this browser only. AI requests go through claude.ai; do not enter sensitive personal data.</p>
+<div class="row"><button class="b g" onclick="exportAll()">⬇ Export my data</button><button class="b g" onclick="if(confirm('Delete all notes and history?')){Notes=[];Hist=[];sv('ec_notes',[]);sv('ec_hist',[]);alert('Deleted.')}">🗑 Delete my data</button></div></div>`};
+function ss(keep){sv("ec_set",St);theme();nav();if(!keep)R.set()}
+async function exportAll(){const d=await claude.use("downloads"),data=JSON.stringify({settings:St,notes:Notes,history:Hist},null,1);if(!d)return navigator.clipboard.writeText(data),alert("Copied to clipboard.");try{await d.save({filename:"educore-data.json",data})}catch(e){}}
+/* QUESTION DETECTION + RESEARCH */
+const RS={cache:{},busy:false,pending:null,t:0,cur:null};
+const QW=/^(was|wie|warum|wieso|weshalb|wer|wen|wem|wann|wo|woher|wohin|wozu|welche[rsmn]?|kann|kannst|könnt|nenne|nennt|erkläre|erklärt|beschreibe|what|why|how|who|when|where|which|can|could|explain|describe|define|ما|ماذا|لماذا|كيف|من|متى|أين|هل|اشرح|عرف|وضح)$/i;
+function looksQ(s){const w=s.trim().split(/\s+/);return w.length>=3&&(/[?؟]\s*$/.test(s)||QW.test(w[0].replace(/[^\p{L}]/gu,"")))}
+function autoDetect(seg){const a=$("#au");if(!a||!a.checked)return;const ss=seg.split(/(?<=[.!?؟])\s+/).filter(looksQ);if(ss.length)research(ss[ss.length-1],false)}
+function manualQ(){const ta=$("#tr");let q=ta.value.slice(ta.selectionStart,ta.selectionEnd).trim();if(!q){const ss=live.text.split(/(?<=[.!?؟])\s+/).filter(looksQ);q=ss.length?ss[ss.length-1]:live.text.slice(-200)}if(q.trim())research(q,true)}
+async function research(q,manual){const k=q.toLowerCase().replace(/\s+/g," ").trim(),o=$("#q16");
+if(RS.cache[k]){showQ(RS.cache[k],true);return}
+if(RS.busy||(!manual&&Date.now()-RS.t<6000)){RS.pending=q;if(!RS.busy)setTimeout(()=>{if(RS.pending&&!RS.busy){const p=RS.pending;RS.pending=null;research(p,false)}},6000);return}
+RS.busy=true;RS.t=Date.now();RS.lastQ=q;const ST={detect:"Checking if this is a real question…",search:"Searching the web…",read:"Reading web pages…",answer:"Writing answer from sources…"};
+const say=s=>{if(o)o.innerHTML=`<p class="mu"><span class="spin"></span> ${s}</p>`};say(ST.detect);
+try{const r=await apiStream("/api/research",{segment:q,context:live.text.slice(-1500),level:St.level},e=>e.step&&say(ST[e.step]));
+if(r.is_question!==false)RS.cache[k]=r;showQ(r,!!r.cached);log("question",q)}
+catch(e){if(o)o.innerHTML=`<p class="err">⚠ ${esc(e.message)} <button class="b g" onclick="research(RS.lastQ,true)">↻ Retry</button></p>`}
+RS.busy=false;if(RS.pending){const p=RS.pending;RS.pending=null;if(p!==q)research(p,false)}}
+function showQ(r,cached){RS.cur=[r,cached];const o=$("#q16");if(!o)return;
+if(r.is_question===false){o.innerHTML=card("2 · NO GENUINE QUESTION",esc(r.question||"")+'\n<span class="mu">No web search was made.</span>');return}
+const A=r.answer||{},ok=u=>/^https?:\/\//.test(u)?esc(u):"#",L=ids=>ids.map(i=>"["+i+"]").join(" ");
+o.innerHTML=card("2 · "+(r.certainty==="certain"?"DETECTED QUESTION":"POSSIBLE QUESTION")+(cached?" · cached":""),esc(r.question)+fields(r,{language:"Language (AI estimate)",subject:"Subject",keywords:"Keywords"}))
++card("3 · Web research (real search + pages read)",(r.sources||[]).length?(r.sources.map(s=>`<b>[${s.id}]</b> <a href="${ok(s.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--p)">${esc(s.title||s.url)}</a>\n<span class="mu">${esc(s.domain)} · ${s.read?"page text read":"snippet only"}\n${esc(s.url)}</span>`).join("\n\n")):'<span class="mu">The search returned no results.</span>')
++card("4 · Answer",'<span class="lbl">AI-written from the sources above</span>'+fields(A,{short_school:"Short school answer (DE)",de:"Deutsch",en:"English",ar:"العربية",detailed:"Detailed"})
++((r.supported||[]).length?'<div class="lbl">✅ Supported by retrieved sources</div>'+r.supported.map(s=>"• "+esc(s.text)+" <b>"+L(s.source_ids)+"</b>").join("\n"):'<div class="lbl">No statement could be tied to a source</div>')
++((r.ai_only||[]).length?'<div class="lbl">🤖 AI explanation (not backed by a source)</div>'+r.ai_only.map(s=>"• "+esc(s)).join("\n"):"")
++fields(r,{confidence:"AI confidence",notes:"Notes / uncertainty"}))}
+theme();nav();R.dash();
+</script></body></html>
